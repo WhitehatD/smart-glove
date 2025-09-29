@@ -1,1 +1,6 @@
 opencv-python
+numpy
+pyyaml
+open3d
+matplotlib
+pynput
