@@ -27,7 +27,13 @@ docker pull jahaniam/orbslam3:ubuntu20_noetic_cpu
 
 # Remove existing container
 docker rm -f orbslam3 &>/dev/null
-[ -d "ORB_SLAM3" ] && sudo rm -rf ORB_SLAM3 && mkdir ORB_SLAM3
+
+# Remove existing ORB_SLAM3 directory if it exists
+if [ -d "ORB_SLAM3" ]; then
+    echo "Removing existing ORB_SLAM3 directory..."
+    rm -rf ORB_SLAM3 || sudo rm -rf ORB_SLAM3
+fi
+mkdir -p ORB_SLAM3
 
 # Create a new container
 docker run -td --privileged --net=host --ipc=host \
@@ -43,8 +49,8 @@ docker run -td --privileged --net=host --ipc=host \
     -v `pwd`/ORB_SLAM3:/ORB_SLAM3 \
     jahaniam/orbslam3:ubuntu20_noetic_cpu bash
     
-# Git pull orbslam and compile
-docker exec -it orbslam3 bash -i -c "git clone -b main git@github.com:WhitehatD/ORB-SLAM3.git /ORB_SLAM3 && cd /ORB_SLAM3 && chmod +x build.sh && ./build.sh "
+# Git pull orbslam and compile (using HTTPS instead of SSH)
+docker exec -it orbslam3 bash -i -c "git clone -b main https://github.com/WhitehatD/ORB-SLAM3.git /ORB_SLAM3 && cd /ORB_SLAM3 && chmod +x build.sh && ./build.sh "
 # Compile ORBSLAM3-ROS
 docker exec -it orbslam3 bash -i -c "echo 'ROS_PACKAGE_PATH=/opt/ros/noeti/share:/ORB_SLAM3/Examples/ROS'>>~/.bashrc && source ~/.bashrc && cd /ORB_SLAM3 && chmod +x build_ros.sh && ./build_ros.sh"
 
