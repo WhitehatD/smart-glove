@@ -8,12 +8,12 @@ if ! nvidia-smi | grep "Driver" 2>/dev/null; then
   while true; do
     read -p "Do you still wish to continue?" yn
     case $yn in
-      [Yy]* ) make install; break;;
+      [Yy]* ) break;;
       [Nn]* ) exit;;
       * ) echo "Please answer yes or no.";;
     esac
   done
-fi 
+fi
 
 # UI permisions
 XSOCK=/tmp/.X11-unix
@@ -24,17 +24,8 @@ xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
 xhost +local:docker
 docker pull jahaniam/orbslam3:ubuntu20_noetic_cuda
 
-# docker pull jahaniam/orbslam3:ubuntu20_noetic_cuda
-
 # Remove existing container
 docker rm -f orbslam3 &>/dev/null
-
-# Remove existing ORB_SLAM3 directory if it exists
-if [ -d "ORB_SLAM3" ]; then
-    echo "Removing existing ORB_SLAM3 directory..."
-    rm -rf ORB_SLAM3 || sudo rm -rf ORB_SLAM3
-fi
-mkdir -p ORB_SLAM3
 
 # Create a new container
 docker run -td --privileged --net=host --ipc=host \
@@ -52,7 +43,11 @@ docker run -td --privileged --net=host --ipc=host \
     jahaniam/orbslam3:ubuntu20_noetic_cuda bash
 
 # Git pull orbslam and compile
-docker exec -it orbslam3 bash -c "git clone -b main https://github.com/WhitehatD/ORB-SLAM3.git /ORB_SLAM3 && cd /ORB_SLAM3 && chmod +x build.sh && ./build.sh"
+# Clone if missing, otherwise pull updates
+docker exec -it orbslam3 bash -c "if [ ! -d /ORB_SLAM3/.git ]; then git clone -b main https://github.com/WhitehatD/ORB-SLAM3.git /ORB_SLAM3; else cd /ORB_SLAM3 && git pull origin main; fi"
+# Always try to build
+docker exec -it orbslam3 bash -c "cd /ORB_SLAM3 && chmod +x build.sh && ./build.sh"
+
 # Compile ORBSLAM3-ROS
-docker exec -it orbslam3 bash -c "echo 'ROS_PACKAGE_PATH=/opt/ros/noetic/share:/ORB_SLAM3/Examples/ROS' >> ~/.bashrc && source ~/.bashrc && cd /ORB_SLAM3 && chmod +x build_ros.sh && ./build_ros.sh"
+docker exec -it orbslam3 bash -c "echo 'export ROS_PACKAGE_PATH=/opt/ros/noetic/share:/ORB_SLAM3/Examples/ROS' >> ~/.bashrc && source /opt/ros/noetic/setup.bash && cd /ORB_SLAM3 && chmod +x build_ros.sh && ./build_ros.sh"
 
