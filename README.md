@@ -44,6 +44,13 @@ You can use vscode remote development (recommended) or sublime to change codes.
 
 ## Repository Structure
 
+### External Dependencies (Submodules)
+
+This repository uses Git submodules for core functionality. If these folders are empty, run `git submodule update --init --recursive`.
+
+- **ORB_SLAM3**: [https://github.com/WhitehatD/ORB-SLAM3](https://github.com/WhitehatD/ORB-SLAM3)
+- **BNO08x-driver**: [https://github.com/WhitehatD/BNO08x-driver](https://github.com/WhitehatD/BNO08x-driver)
+
 ### Calibration
 
 Contains a comprehensive suite of tools for camera-IMU calibration and data formatting compatible with ORB-SLAM3 and Kalibr.
@@ -64,4 +71,4 @@ Tools to inspect the resulting point clouds and trajectories.
 This folder contains the datasets for 5 distinct experiments used for validation.
 **Note**: The raw data is too large for version control and is excluded from this repository.
 
-- **[Download Experiments Dataset](https://drive.google.com/uc?export=download&id=10qP89dVOmioyUQNZ_IvoiLDkTQXBEzjVH)**
+- **[Download Experiments Dataset](https://drive.google.com/uc?export=download&id=10qP89dVOmioyUQNZ_IvoiLDkTQXBEzjG)**
