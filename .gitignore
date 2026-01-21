@@ -1,2 +1,5 @@
 Datasets/*
 ORB_SLAM3/*
+*.tex
+.idea/*
+experiments/*

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive SLAM 3D Viewer (Three.js)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for interactive camera control -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+        canvas { display: block; }
+        #info-panel {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            z-index: 10;
+        }
+        #warning-banner {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            padding: 0.5rem 1rem;
+            background-color: #ef4444; /* Red-500 */
+            color: white;
+            font-weight: bold;
+            border-radius: 0 0 0.5rem 0.5rem;
+            text-align: center;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div id="container" class="w-full h-screen bg-gray-900"></div>
+    <div id="info-panel" class="bg-gray-800 p-4 rounded-lg shadow-xl text-white opacity-90 w-80">
+        <h1 class="text-xl font-bold mb-3 text-yellow-400">SLAM 3D Map Viewer</h1>
+        
+        <!-- File Input Options for loading data -->
+        <div class="space-y-3">
+            <div>
+                <label for="pointCloudFile" class="block text-sm font-medium mb-1 text-green-400">1. Select Point Cloud File (.txt)</label>
+                <input type="file" id="pointCloudFile" accept=".txt" class="w-full text-xs file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer">
+            </div>
+
+            <div>
+                <label for="trajectoryFile" class="block text-sm font-medium mb-1 text-pink-400">2. Select Trajectory File (.txt)</label>
+                <input type="file" id="trajectoryFile" accept=".txt" class="w-full text-xs file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 cursor-pointer">
+            </div>
+
+            <button id="loadDataButton" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg transition duration-150 ease-in-out cursor-pointer disabled:opacity-50" disabled>
+                Load and Visualize Data
+            </button>
+        </div>
+
+        <div class="mt-4 text-xs border-t border-gray-700 pt-3">
+            <p class="mb-1"><span class="text-green-400">Point Cloud Format:</span> X Y Z (Columns 0, 1, 2)</p>
+            <p><span class="text-pink-400">Trajectory Format:</span> Timestamp X Y Z QX QY QZ QW (X Y Z are Columns 1, 2, 3)</p>
+            <p class="mt-2 text-sm text-yellow-300">Markers: <span id="startEndInfo" class="font-semibold">Markers will appear after loading.</span></p>
+            <p class="mt-1 text-sm text-yellow-300">Status: <span id="loadStatus">Awaiting file selection...</span></p>
+        </div>
+
+    </div>
+
+    <div id="warning-banner" class="hidden">
+        Data loaded successfully! Use mouse/touch to interact.
+    </div>
+    
+    <script>
+        // --- Global Data Storage ---
+        let pointCloudTxt = null;
+        let trajectoryTxt = null;
+
+        // --- File Reader Utility ---
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(new Error("Error reading file."));
+                reader.readAsText(file);
+            });
+        }
+
+        /**
+         * Parses the raw string data into a flattened Float32Array for Three.js.
+         * @param {string} rawData - The string content of the TXT file.
+         * @param {number[]} columnsToExtract - 0-indexed column indices for X, Y, Z.
+         * @returns {Float32Array} - Flattened array of [X1, Y1, Z1, X2, Y2, Z2, ...].
+         */
+        function parseData(rawData, columnsToExtract) {
+            const dataArray = [];
+            // Split by line, clean up leading/trailing whitespace, and filter out empty lines
+            const lines = rawData.trim().split('\n').filter(line => line.trim().length > 0);
+
+            for (const line of lines) {
+                // Split by whitespace (one or more spaces)
+                const parts = line.trim().split(/\s+/);
+                
+                // Ensure there are enough parts to extract the required columns
+                if (parts.length > Math.max(...columnsToExtract)) {
+                    for (const colIndex of columnsToExtract) {
+                        dataArray.push(parseFloat(parts[colIndex]));
+                    }
+                }
+            }
+            return new Float32Array(dataArray);
+        }
+
+        /**
+         * Creates a simple circular texture (a "dot") for the PointsMaterial.
+         * This makes the points appear round instead of square.
+         * @returns {THREE.Texture}
+         */
+        function createDotTexture() {
+            const canvas = document.createElement('canvas');
+            const size = 64;
+            canvas.width = size;
+            canvas.height = size;
+            const context = canvas.getContext('2d');
+            
+            // Draw a white circle
+            context.beginPath();
+            context.arc(size / 2, size / 2, size / 2, 0, 2 * Math.PI);
+            context.fillStyle = 'white';
+            context.fill();
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+
+        // --- Three.js Initialization and Visualization Logic ---
+        let scene, camera, renderer, controls;
+        const container = document.getElementById('container');
+        let dotTexture = null;
+
+        // This function now expects the raw data strings
+        function initVisualization(pointCloudRawData, trajectoryRawData) {
+            
+            // 1. Parse data
+            const pointCloudData = parseData(pointCloudRawData, [0, 1, 2]); 
+            const trajectoryData = parseData(trajectoryRawData, [1, 2, 3]); 
+
+            // 2. Clear previous scene if it exists (for re-loading)
+            if (scene) {
+                // Dispose of geometries and materials to free up memory
+                scene.traverse(object => {
+                    if (object.geometry) object.geometry.dispose();
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach(m => m.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
+                    }
+                    // Remove object from scene
+                    scene.remove(object);
+                });
+                // Remove existing renderer and reinitialize everything
+                if (renderer) container.removeChild(renderer.domElement);
+                if (controls) controls.dispose();
+            }
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111827); 
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 50);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 1;
+            controls.maxDistance = 500;
+
+            // Initialize texture once
+            if (!dotTexture) {
+                dotTexture = createDotTexture();
+            }
+
+            // --- Load Map Points (Point Cloud) ---
+            const pointGeometry = new THREE.BufferGeometry();
+            pointGeometry.setAttribute('position', new THREE.Float32BufferAttribute(pointCloudData, 3));
+
+            const pointMaterial = new THREE.PointsMaterial({ 
+                color: 0x00FF00, // Vibrant Neon Green for point cloud
+                size: 2.0, 
+                sizeAttenuation: false, 
+                map: dotTexture, 
+                transparent: true,
+                alphaTest: 0.5 
+            });
+
+            const pointCloud = new THREE.Points(pointGeometry, pointMaterial);
+            scene.add(pointCloud);
+
+            // --- Load Trajectory (Line) ---
+            const trajGeometry = new THREE.BufferGeometry();
+            trajGeometry.setAttribute('position', new THREE.Float32BufferAttribute(trajectoryData, 3));
+
+            const trajMaterial = new THREE.LineBasicMaterial({
+                color: 0xFF00FF, // Vibrant Neon Magenta
+                linewidth: 4, 
+            });
+
+            const trajectory = new THREE.Line(trajGeometry, trajMaterial);
+            scene.add(trajectory);
+            
+            // --- ADDITION: Start and End Markers to the Trajectory ---
+            
+            if (trajectoryData.length >= 3) {
+                // 1. Get Start and End Coordinates
+                // Trajectory data is [X1, Y1, Z1, X2, Y2, Z2, ..., Xn, Yn, Zn]
+                const startX = trajectoryData[0];
+                const startY = trajectoryData[1];
+                const startZ = trajectoryData[2];
+
+                const lastIndex = trajectoryData.length - 3;
+                const endX = trajectoryData[lastIndex];
+                const endY = trajectoryData[lastIndex + 1];
+                const endZ = trajectoryData[lastIndex + 2];
+                
+                // Reduced the size significantly to make it small like the line
+                const markerSize = 0.02; // Size of the sphere marker
+
+                // 2. Create Start Marker (Green Sphere)
+                const startGeometry = new THREE.SphereGeometry(markerSize, 32, 32);
+                const startMaterial = new THREE.MeshBasicMaterial({ color: 0x00FF00 }); // Green
+                const startMarker = new THREE.Mesh(startGeometry, startMaterial);
+                startMarker.position.set(startX, startY, startZ);
+                scene.add(startMarker);
+
+                // 3. Create End Marker (Red Sphere)
+                const endGeometry = new THREE.SphereGeometry(markerSize, 32, 32);
+                const endMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000 }); // Red
+                const endMarker = new THREE.Mesh(endGeometry, endMaterial);
+                endMarker.position.set(endX, endY, endZ);
+                scene.add(endMarker);
+
+                // Update info panel
+                document.getElementById('startEndInfo').innerHTML = `<span class="text-green-400 font-bold">START</span>: Green Sphere, <span class="text-red-400 font-bold">END</span>: Red Sphere.`;
+
+            } else {
+                // Handle case where trajectory data is too short
+                document.getElementById('startEndInfo').textContent = `Trajectory too short to mark start/end.`;
+            }
+
+            // --- Axes Helper for Orientation ---
+            const axesHelper = new THREE.AxesHelper(10); 
+            scene.add(axesHelper);
+
+            // Ensure the animation loop is running only once
+            if (typeof window.animationFrameId === 'undefined') {
+                 animate();
+                 window.addEventListener('resize', onWindowResize, false);
+            }
+           
+            document.getElementById('loadStatus').textContent = `Loaded ${pointCloudData.length / 3} points and ${trajectoryData.length / 3} keyframes.`;
+            document.getElementById('warning-banner').classList.remove('hidden');
+        }
+        
+        // --- Helper Functions ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            window.animationFrameId = requestAnimationFrame(animate);
+            controls.update(); 
+            renderer.render(scene, camera);
+        }
+
+        function updateLoadButton() {
+            const button = document.getElementById('loadDataButton');
+            if (pointCloudTxt && trajectoryTxt) {
+                button.disabled = false;
+                button.textContent = "Load and Visualize Data";
+            } else {
+                button.disabled = true;
+                button.textContent = "Select both files to load";
+            }
+        }
+        
+        // --- Main Application Flow (DOM interaction) ---
+        window.onload = function() {
+            const pointCloudInput = document.getElementById('pointCloudFile');
+            const trajectoryInput = document.getElementById('trajectoryFile');
+            const loadButton = document.getElementById('loadDataButton');
+            
+            // Event listener for Point Cloud file selection
+            pointCloudInput.addEventListener('change', async (event) => {
+                if (event.target.files.length > 0) {
+                    try {
+                        document.getElementById('loadStatus').textContent = "Reading Point Cloud file...";
+                        pointCloudTxt = await readFileAsText(event.target.files[0]);
+                        document.getElementById('loadStatus').textContent = "Point Cloud ready. Awaiting Trajectory...";
+                    } catch (error) {
+                        console.error("Point Cloud Load Error:", error);
+                        document.getElementById('loadStatus').textContent = "Error loading Point Cloud. Check console.";
+                        pointCloudTxt = null;
+                    }
+                    updateLoadButton();
+                }
+            });
+
+            // Event listener for Trajectory file selection
+            trajectoryInput.addEventListener('change', async (event) => {
+                if (event.target.files.length > 0) {
+                    try {
+                        document.getElementById('loadStatus').textContent = "Reading Trajectory file...";
+                        trajectoryTxt = await readFileAsText(event.target.files[0]);
+                        document.getElementById('loadStatus').textContent = "Trajectory ready. Click Load.";
+                    } catch (error) {
+                        console.error("Trajectory Load Error:", error);
+                        document.getElementById('loadStatus').textContent = "Error loading Trajectory. Check console.";
+                        trajectoryTxt = null;
+                    }
+                    updateLoadButton();
+                }
+            });
+
+            // Event listener for the Load Button
+            loadButton.addEventListener('click', () => {
+                if (pointCloudTxt && trajectoryTxt) {
+                    document.getElementById('loadStatus').textContent = "Parsing and rendering data...";
+                    try {
+                        initVisualization(pointCloudTxt, trajectoryTxt);
+                    } catch (error) {
+                        console.error("Visualization Error:", error);
+                        document.getElementById('loadStatus').textContent = "Error during visualization. Check console.";
+                    }
+                }
+            });
+
+            // Initial state update
+            updateLoadButton();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+%YAML:1.0
+# ORB-SLAM3 Stereo Config (converted from Kalibr)
+File.version: "1.0"
+
+Camera.type: "PinHole"
+
+Camera1.fx: 1116.0716978461
+Camera1.fy: 1113.5876280261
+Camera1.cx: 676.7151289182
+Camera1.cy: 368.2312933756
+Camera1.k1: 0.0751474849
+Camera1.k2: -0.1588669460
+Camera1.p1: -0.0091015625
+Camera1.p2: -0.0061587455
+Camera1.k3: 0.0000000000
+
+Camera2.fx: 1123.9501895340
+Camera2.fy: 1120.9659950629
+Camera2.cx: 657.6730083004
+Camera2.cy: 407.3479469264
+Camera2.k1: 0.0228297120
+Camera2.k2: -0.0101496348
+Camera2.p1: -0.0024908526
+Camera2.p2: -0.0022673567
+Camera2.k3: 0.0000000000
+
+Camera.width: 1280
+Camera.height: 720
+Camera.fps: 30
+Camera.RGB: 1
+
+# Transformation from Camera 1 (cam0/left) to Camera 2 (cam1/right)
+Stereo.T_c1_c2: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [0.9996994734, -0.0001331648, -0.0245153140, -0.0761111006, -0.0000233070, 0.9999796152, -0.0063822167, 0.0008099755, 0.0245156642, 0.0063808700, 0.9996790886, 0.0003864944, 0.0000000000, 0.0000000000, 0.0000000000, 1.0000000000]
+
+Stereo.b: 0.0761111000
+Stereo.bf: 84.9454446019
+Stereo.ThDepth: 40.0
+
+# Stereo Rectification (for online rectification)
+LEFT.K: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: f
+   data: [1116.0716552734, 0.0000000000, 676.7151489258, 0.0000000000, 1113.5876464844, 368.2312927246, 0.0000000000, 0.0000000000, 1.0000000000]
+RIGHT.K: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: f
+   data: [1123.9501953125, 0.0000000000, 657.6730346680, 0.0000000000, 1120.9659423828, 407.3479614258, 0.0000000000, 0.0000000000, 1.0000000000]
+LEFT.D: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: f
+   data: [0.0751474872, -0.1588669419, -0.0091015622, -0.0061587454, 0.0000000000]
+RIGHT.D: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: f
+   data: [0.0228297114, -0.0101496344, -0.0024908525, -0.0022673567, 0.0000000000]
+LEFT.R: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: f
+   data: [0.9995056987, -0.0108066145, -0.0295217410, 0.0107104136, 0.9999368191, -0.0034148372, 0.0295567792, 0.0030969593, 0.9995583296]
+RIGHT.R: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: f
+   data: [0.9999305010, -0.0106412750, -0.0050776768, 0.0106577538, 0.9999380112, 0.0032292982, 0.0050429981, -0.0032831903, 0.9999818802]
+LEFT.P: !!opencv-matrix
+   rows: 3
+   cols: 4
+   dt: f
+   data: [1220.5410156250, 0.0000000000, 687.9291381836, 0.0000000000, 0.0000000000, 1220.5410156250, 383.7481994629, 0.0000000000, 0.0000000000, 0.0000000000, 1.0000000000, 0.0000000000]
+RIGHT.P: !!opencv-matrix
+   rows: 3
+   cols: 4
+   dt: f
+   data: [1220.5410156250, 0.0000000000, 687.9291381836, -92.9031753540, 0.0000000000, 1220.5410156250, 383.7481994629, 0.0000000000, 0.0000000000, 0.0000000000, 1.0000000000, 0.0000000000]
+Q: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1.0000000000, 0.0000000000, 0.0000000000, -687.9291381836, 0.0000000000, 1.0000000000, 0.0000000000, -383.7481994629, 0.0000000000, 0.0000000000, 0.0000000000, 1220.5410156250, 0.0000000000, 0.0000000000, 13.1377744675, -0.0000000000]
+
+ORBextractor.nFeatures: 2000
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 12
+ORBextractor.minThFAST: 7
+
+# Viewer Parameters
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1.0
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize: 2.0
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3.0
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500.0
