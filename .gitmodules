@@ -1,3 +1,7 @@
 [submodule "ORB_SLAM3"]
 	path = ORB_SLAM3
 	url = https://github.com/WhitehatD/ORB-SLAM3.git
+
+[submodule "BNO08x-driver"]
+	path = BNO08x-driver
+	url = https://github.com/WhitehatD/BNO08x-driver.git
